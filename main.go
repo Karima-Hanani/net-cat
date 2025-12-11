@@ -6,6 +6,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"time"
 )
 
 type ChatServer struct {
@@ -113,12 +114,51 @@ func (cs *ChatServer) HandleClient(conn net.Conn) {
 		username = strings.TrimSpace(input)
 		if username == "" {
 			conn.Write([]byte("Username cannot be empty. Try again.\n"))
-			continue 
+			continue
 		}
-		if cs.UserNotExists(username,conn) {
+		if cs.UserNotExists(username, conn) {
 			break
 		}
 		conn.Write([]byte("Username already taken. Try another.\n"))
 	}
-	fmt.Printf("New client : %s (Total : %d )",username, cs.UserCount())
+
+	fmt.Printf("New client : %s (Total : %d )", username, cs.UserCount())
+
+	history := cs.GetHistory()
+
+	for _, message := range history {
+		conn.Write([]byte(message))
+	}
+
+	joinMessage := fmt.Sprintf("%s joined the chat\n", username)
+	cs.Broadcast(joinMessage, username)
+	cs.AddToHistory(joinMessage)
+
+	for {
+		now := time.Now().Format("2006-01-02 15:04:05")
+		prompt := fmt.Sprintf("[%s][%s]:", now, username)
+		conn.Write([]byte(prompt))
+
+		message, err := reader.ReadString('\n')
+		if err != nil {
+			break
+		}
+		message = strings.TrimSpace(message)
+
+		if message == "" {
+			continue
+		}
+
+		if message == "/users" {
+			users := cs.GetUsersList()
+			list := fmt.Sprintf("online users : %s\n", strings.Join(users, ","))
+			conn.Write([]byte(list))
+			continue
+		}
+
+		if message == "exit" {
+			break
+		}
+
+	}
 }
